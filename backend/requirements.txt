@@ -1,2 +1,10 @@
-uvicorn==0.37.0
-alembic==1.17.0
+uvicorn
+pydantic-settings
+pydantic
+confluent-kafka
+fastavro
+minio
+redis
+fastapi
+python-multipart
+gigachat

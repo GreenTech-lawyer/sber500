@@ -1,72 +1,224 @@
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: nginx_proxy
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./dist/frontend/browser:/usr/share/nginx/html:ro
-      - ./nginx/logs:/var/log/nginx
+#  nginx:
+#    image: nginx:alpine
+#    container_name: nginx_proxy
+#    ports:
+#      - "80:80"
+#    volumes:
+#      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+#      - ./dist/frontend/browser:/usr/share/nginx/html:ro
+#      - ./nginx/logs:/var/log/nginx
+#    depends_on:
+#      - backend
+#      - frontend
+#    networks:
+#      - app-network
+#    restart: unless-stopped
+
+  api:
+    build: ./backend
+    env_file: .env
     depends_on:
-      - backend
-      - frontend
+      - kafka
+      - minio
+      - redis
+    networks:
+      - app-network
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+#  frontend:
+#    build:
+#      context: ./frontend
+#      target: build
+#    networks:
+#      - app-network
+#    volumes:
+#      - ./dist/frontend/browser:/usr/share/nginx/html:ro
+
+#  db:
+#    image: pgvector/pgvector:pg17-bookworm
+#    env_file:
+#      - .env
+#    ports:
+#      - "${POSTGRES_PORT}:5432"
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
+#    networks:
+#      - app-network
+
+#  pgadmin:
+#    image: dpage/pgadmin4
+#    container_name: pgadmin_container
+#    restart: always
+#    env_file:
+#      - .env
+#    ports:
+#      - "5050:80"
+#    depends_on:
+#      db:
+#        condition: service_healthy
+#    networks:
+#      - app-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8081:8081"
+    networks:
+      - app-network
+
+  parser:
+    build:
+      context: backend
+      dockerfile: agents/parser/Dockerfile
+    env_file:
+      - backend/agents/parser/.env
+    environment:
+      CONSUME_TOPICS: "docs.uploaded"
+      PRODUCE_TOPIC: "docs.parsed"
+    depends_on:
+      - kafka
+      - redis
+      - minio
     networks:
       - app-network
     restart: unless-stopped
 
-  backend:
-    build: ./backend
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - app-network
-    expose:
-      - "8081"
-
-  frontend:
+  legal:
     build:
-      context: ./frontend
-      target: build
-    networks:
-      - app-network
-    volumes:
-      - ./dist/frontend/browser:/usr/share/nginx/html:ro
-
-  db:
-    image: pgvector/pgvector:pg17-bookworm
+      context: backend
+      dockerfile: agents/legal/Dockerfile
     env_file:
-      - .env
-    ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app-network
-
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin_container
-    restart: always
-    env_file:
-      - .env
-    ports:
-      - "5050:80"
+      - backend/agents/legal/.env
     depends_on:
-      db:
-        condition: service_healthy
+      - kafka
+      - redis
     networks:
       - app-network
+    restart: unless-stopped
+
+  assistant:
+    build:
+      context: backend
+      dockerfile: agents/assistant/Dockerfile
+    env_file:
+      - backend/agents/assistant/.env
+    environment:
+      PRODUCE_TOPIC: "draft.created"
+    depends_on:
+      - kafka
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  validator:
+    build:
+      context: backend
+      dockerfile: agents/validator/Dockerfile
+    env_file:
+      - backend/agents/validator/.env
+    environment:
+      CONSUME_TOPICS: "draft.created"
+      PRODUCE_TOPIC: "draft.approved"
+    depends_on:
+      - kafka
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      - kafka
+    networks:
+      - app-network
+    volumes:
+      - ./backend/init-topics.sh:/init-topics.sh
+    entrypoint: ["/init-topics.sh"]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - app-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: sber500-kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: sber500
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - app-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  minio_data:
 
 networks:
   app-network:

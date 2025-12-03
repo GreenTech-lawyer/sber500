@@ -1,0 +1,5 @@
+confluent-kafka
+requests
+jinja2
+redis
+gigachat

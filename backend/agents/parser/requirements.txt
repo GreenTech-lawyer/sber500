@@ -1,0 +1,10 @@
+confluent-kafka
+minio
+pytesseract
+pdf2image
+PyPDF2
+Pillow
+redis
+python-dotenv
+fastapi
+uvicorn

@@ -41,7 +41,7 @@ class FilesService:
 
         return {"upload_url": public_url, "object_id": object_id, "bucket": self.bucket}
 
-    def notify_upload(self, object_id: str, bucket: str, user_id: str, file_id: str | None = None, content_type: str | None = None, session_id: str | None = None, redis_client: "Redis" = Depends(get_redis_client)):
+    def notify_upload(self, object_id: str, bucket: str, user_id: str, file_id: str | None = None, content_type: str | None = None, session_id: str | None = None, redis_client: Redis = Depends(get_redis_client)):
         """
         Публикация события об успешной загрузке файла в Kafka.
         Также, если передан session_id, сразу добавляем файл в активные документы сессии в Redis,
@@ -73,7 +73,7 @@ class FilesService:
 
         return {"status": "ok", "file_id": file_id}
 
-    def get_files_for_session(self, session_id: str, redis_client: "Redis" = Depends(get_redis_client)):
+    def get_files_for_session(self, session_id: str, redis_client: Redis):
         """
         Получение списка файлов, связанных с сессией.
         """

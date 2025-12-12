@@ -1,6 +1,8 @@
 from fastapi import HTTPException, APIRouter, Depends
 import logging
 
+from redis import Redis
+
 from api.deps import minio_client, MINIO_BUCKET, kafka_client, KAFKA_PRODUCE_TOPIC, get_redis_client
 from api.schemas import UploadReq, NotifyReq
 from api.services.files_service import FilesService
@@ -28,5 +30,5 @@ def notify_upload(msg: NotifyReq, redis_client=Depends(get_redis_client)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/files-for-session/{session_id}")
-def get_files_for_session(session_id: str):
+def get_files_for_session(session_id: str, redis_client: Redis = Depends(get_redis_client)):
     return files_service.get_files_for_session(session_id)

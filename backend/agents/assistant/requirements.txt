@@ -2,3 +2,6 @@ confluent-kafka
 redis
 pydantic
 python-dotenv
+jinja2
+gigachat
+requests

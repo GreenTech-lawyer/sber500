@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import Optional
 
 class UploadRequest(BaseModel):
     bucket: str
@@ -21,3 +20,4 @@ class NotifyReq(BaseModel):
     user_id: str
     file_id: str | None = None
     content_type: str | None = None
+    session_id: str | None = None

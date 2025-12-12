@@ -1,27 +1,19 @@
 import logging
 import os
-import uuid
-import redis
 
 logger = logging.getLogger("parser.storage")
 
 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
-REDIS_TTL = int(os.getenv("REDIS_TTL_SECONDS", str(7 * 24 * 3600)))
-
-r = redis.from_url(REDIS_URL, decode_responses=True)
+from agents_shared.redis_storage import save_text, add_active_document, get_active_documents_for_session
 
 
-def save_text(id_hint: str, content: str) -> str:
-    key = f"doc:text:{id_hint}:{uuid.uuid4().hex}"
-    r.set(key, content)
-    r.expire(key, REDIS_TTL)
-    logger.debug("Saved text to redis key=%s size=%d", key, len(content) if content else 0)
-    return key
+def save_text_for_session(session_id: str, file_id: str, content: str) -> str:
+    return save_text(None, session_id=session_id, file_id=file_id, content=content)
 
 
-def get_text(key: str) -> str:
-    val = r.get(key)
-    if val is None:
-        raise KeyError(f"Redis key {key} not found")
-    return str(val)
+def add_active_document_local(file_id: str, session_id: str) -> None:
+    return add_active_document(None, session_id=session_id, file_id=file_id)
+
+
+def get_active_documents_for_session_local(session_id: str):
+    return get_active_documents_for_session(None, session_id=session_id)

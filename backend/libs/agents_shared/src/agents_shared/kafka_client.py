@@ -1,9 +1,11 @@
 import json
 import logging
+import os
+
 from confluent_kafka import Producer, Consumer, KafkaError
 from typing import Callable, Optional
 
-from api.deps import KAFKA_BOOTSTRAP
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 
 logger = logging.getLogger("shared.kafka")
 

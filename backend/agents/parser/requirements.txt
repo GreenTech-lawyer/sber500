@@ -7,4 +7,4 @@ Pillow
 redis
 python-dotenv
 fastapi
-uvicorn
+uvicorn[standard]

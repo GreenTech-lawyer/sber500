@@ -3,7 +3,25 @@ set -e
 
 BOOTSTRAP_SERVER=${BOOTSTRAP_SERVER:-kafka:9092}
 
-TOPICS=("docs.uploaded" "docs.parsed" "analysis.completed" "draft.created" "draft.rejected" "docs.upload.failed" "docs.parse.failed" "analysis.failed" "user.message")
+TOPICS=(
+    "docs.uploaded"
+    "docs.parsed"
+    "analysis.completed"
+    "user.message"
+    "chat.response"
+    "draft.created"
+    "draft.rejected"
+    "legal.followup.requested"
+    "assistant.response"
+  )
+
+TOPICS+=(
+    "docs.upload.failed"
+    "docs.parse.failed"
+    "analysis.failed"
+    "chat.error"
+    "legal.followup.failed"
+)
 
 echo "Waiting for Kafka to be ready at $BOOTSTRAP_SERVER..."
 until kafka-topics --bootstrap-server "$BOOTSTRAP_SERVER" --list >/dev/null 2>&1; do

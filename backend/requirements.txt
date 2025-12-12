@@ -1,4 +1,4 @@
-uvicorn
+uvicorn[standard]
 pydantic-settings
 pydantic
 confluent-kafka
@@ -8,3 +8,10 @@ redis
 fastapi
 python-multipart
 gigachat
+uuid
+sqlalchemy
+sqlmodel
+starlette
+alembic
+psycopg[binary]
+websockets
